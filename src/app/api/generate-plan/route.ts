@@ -38,19 +38,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
-// import OpenAI from "openai";
-
-// const openai = new OpenAI({
-//   apiKey: "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",
-// });
-
-// const completion = openai.chat.completions.create({
-//   model: "gpt-4o-mini",
-//   store: true,
-//   messages: [
-//     {"role": "user", "content": "write a haiku about ai"},
-//   ],
-// });
-
-// completion.then((result) => console.log(result.choices[0].message));
