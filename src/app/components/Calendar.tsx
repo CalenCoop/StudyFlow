@@ -14,8 +14,8 @@ export default function Calendar({ events }: { events: StudyTask[] }) {
   //convert study tasks to calendar events
   const calendarEvents: CalendarEvent[] = events?.map((task) => ({
     title: `${task.task} (${task.duration} mins)`,
-    start: new Date(), //replace with actual dates from scheduling logic
-    end: new Date(new Date().getTime() + task.duration * 60000), //convert minutes to milliseconds
+    start: new Date(task.date), //replace with actual dates from scheduling logic
+    end: new Date(new Date(task.date).getTime() + task.duration * 60000), //convert minutes to milliseconds
   }));
 
   return (
