@@ -6,6 +6,7 @@ import Calendar from "./components/Calendar";
 export interface StudyTask {
   task: string;
   duration: number;
+  date: string;
 }
 
 export default function Home() {
@@ -31,13 +32,15 @@ export default function Home() {
       if (!response.ok) {
         throw new Error(data.error || "Failed to generate plan");
       }
-      setPlan(data.plan.tasks); //adjust based on the OpenAI response structure
+      console.log("API Response data on Pagetsx", data); //debugging
+      setPlan(data); //adjust based on the OpenAI response structure
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setIsLoading(false);
     }
   }
+  // console.log("plan", plan);
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
