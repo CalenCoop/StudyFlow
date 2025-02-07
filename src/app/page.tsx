@@ -7,6 +7,8 @@ export interface StudyTask {
   task: string;
   duration: number;
   date: string;
+  // start: string;
+  // end:string;
 }
 
 export default function Home() {
@@ -15,6 +17,10 @@ export default function Home() {
   const [plan, setPlan] = React.useState<StudyTask[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState("");
+
+  //make deadline work
+  const [deadline, setDeadline] = React.useState(null);
+  //create start Date variable
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,7 +38,7 @@ export default function Home() {
       if (!response.ok) {
         throw new Error(data.error || "Failed to generate plan");
       }
-      console.log("API Response data on Pagetsx", data); //debugging
+      console.log("data", data);
       setPlan(data); //adjust based on the OpenAI response structure
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -50,7 +56,7 @@ export default function Home() {
           <input
             type="text"
             placeholder="What would you like to learn?"
-            className="border p-2 flex-1 rounded"
+            className="border text-black p-2 flex-1 rounded "
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             required
@@ -58,12 +64,13 @@ export default function Home() {
           <input
             type="number"
             placeholder="Hours/day"
-            className="border p-2 w-24 rounded"
+            className="border p-2 w-24 rounded text-black"
             min="1"
             value={hoursPerDay}
             onChange={(e) => setHoursPerDay(Number(e.target.value))}
             required
           />
+          {/* <input type="text" /> */}
           <button
             type="submit"
             className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400"
@@ -77,14 +84,15 @@ export default function Home() {
       {/* Display the generated plan */}
       {plan && plan.length > 0 && (
         <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4"> Your Study Plan</h2>
+          {/* <h2 className="text-xl font-semibold mb-4"> Your Study Plan</h2>
           <ul className="list-disc pl-6">
             {plan.map((task, index) => (
               <li key={index} className="mb-2">
-                {task.task} ({task.duration} minutes)
+                {task.task} ({task.duration} minutes) -{" "}
+                {new Date(task.date).toLocaleDateString()}
               </li>
             ))}
-          </ul>
+          </ul> */}
         </div>
       )}
       {/* Calendar Component */}
