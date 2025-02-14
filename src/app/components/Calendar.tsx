@@ -18,6 +18,7 @@ export default function Calendar({ events }: { events: StudyTask[] }) {
     end: new Date(new Date(task.date).getTime() + task.duration * 60000), //convert minutes to milliseconds
   }));
 
+  console.log("calendar events", calendarEvents);
   return (
     <FullCalendar
       plugins={[dayGridPlugin, interactionPlugin]}

@@ -10,66 +10,55 @@ interface AITask {
   recurring?: boolean;
 }
 
+interface AIDailySchedule {
+  [day: string]: Array<{
+    task: string;
+    duration: number;
+  }>;
+}
+
 interface ScheduleTask extends AITask {
   date: string;
 }
 
-//helper function to spread tasks across days
-function scheduleTasks(
-  tasks: AITask[],
-  hoursPerDay: number,
-  deadlineWeeks: number
+function mapScheduleToDates(
+  aiSchedule: AIDailySchedule,
+  deadlineWeeks: number,
+  daysPerWeek: number
 ): ScheduleTask[] {
   const startDate = new Date();
-  const dailyMinutes = hoursPerDay * 60;
-  let currentDay = new Date(startDate);
-  let dailyBudget = dailyMinutes;
-
   const scheduledTasks: ScheduleTask[] = [];
+  let currentDate = new Date(startDate);
 
-  // Schedule recurring tasks first
-  for (let day = 0; day < deadlineWeeks * 7; day++) {
-    // Reset daily budget for each day
-    dailyBudget = dailyMinutes;
+  // Get ordered day names from AI response
+  const daysInOrder = Object.keys(aiSchedule);
 
-    // Add recurring tasks
-    tasks
-      .filter((task) => task.recurring)
-      .forEach((task) => {
-        scheduledTasks.push({
-          ...task,
-          date: currentDay.toISOString().split("T")[0],
-        });
-        dailyBudget -= task.duration;
-      });
+  for (let week = 0; week < deadlineWeeks; week++) {
+    daysInOrder.forEach((dayName) => {
+      // Skip weekends if needed
+      if (daysPerWeek < 7) {
+        // Skip Saturday (6) and Sunday (0)
+        while (currentDate.getDay() === 0 || currentDate.getDay() === 6) {
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+      }
 
-    // Add non-recurring tasks (split into chunks if needed)
-    tasks
-      .filter((task) => !task.recurring)
-      .forEach((task) => {
-        let remainingDuration = task.duration;
-        while (remainingDuration > 0) {
-          const chunk = Math.min(remainingDuration, dailyBudget);
-          if (chunk <= 0) break;
-
+      const tasks = Array.isArray(aiSchedule[dayName])
+        ? aiSchedule[dayName]
+        : [];
+      tasks.forEach((task) => {
+        if (typeof task === "object" && task.duration) {
           scheduledTasks.push({
-            task: `${task.task} (${chunk} mins)`,
-            duration: chunk,
-            date: currentDay.toISOString().split("T")[0],
+            task: task.task,
+            duration: task.duration,
+            date: currentDate.toISOString().split("T")[0],
           });
-
-          remainingDuration -= chunk;
-          dailyBudget -= chunk;
-
-          // Move to next day if budget exhausted
-          if (dailyBudget <= 0) {
-            currentDay.setDate(currentDay.getDate() + 1);
-            dailyBudget = dailyMinutes;
-          }
         }
       });
 
-    currentDay.setDate(currentDay.getDate() + 1);
+      // Move to next day
+      currentDate.setDate(currentDate.getDate() + 1);
+    });
   }
 
   return scheduledTasks;
@@ -78,7 +67,7 @@ function scheduleTasks(
 export async function POST(request: Request) {
   try {
     //parse the req body
-    const { topic, hoursPerDay, deadline } = await request.json();
+    const { topic, hoursPerDay, deadline, daysPerWeek } = await request.json();
 
     //Generate the study plan using GPT-40
     const completion = await openai.chat.completions.create({
@@ -87,28 +76,23 @@ export async function POST(request: Request) {
       messages: [
         {
           role: "system",
-          content: `You are a study planner AI. Generate a structured study plan with tasks and varying durations in minutes. 
-                Include:
-                -daily recurring tasks (max 25 minutes total)
-                - Unique weekly tasks with specific goals
-                Return a JSON object with a 'tasks' array.
-                Example: 
-                {
-                  "tasks": [
-                    { "task": "Solve a LeetCode problem (Arrays)", "duration": 15, "recurring": true },
-                    { "task": "Build a responsive navbar using Flexbox", "duration": 45, "recurring": false },
-                    { "task": "Learn React useState hook", "duration": 30, "recurring": false }
-                  ]
-                }`,
-        },
-        {
-          role: "user",
-          content: `Create a ${deadline}-week plan for ${topic} with ${hoursPerDay} hours/day. 
-            Recurring tasks (warmups, reviews) should take 15-30 mins/day. 
-            Non-recurring tasks must fit in the remaining time (max ${
-              hoursPerDay * 60 - 45
-            } mins/day). 
-            Return JSON: { "tasks": [...] }`,
+          content: `Create a ${deadline}-week study plan for ${topic} with ${hoursPerDay} hours/day, ${daysPerWeek} days/week.
+          Return JSON with a "schedule" object containing daily plans. Each day should have:
+          - 1-3 focused tasks
+          - Total duration exactly ${hoursPerDay * 60} minutes
+          Example response:
+          {
+            "schedule": {
+              "Monday": [
+                { "task": "Warm-up exercises", "duration": 15 },
+                { "task": "Sight reading practice", "duration": 45 }
+              ],
+              "Wednesday": [
+                { "task": "Scale practice", "duration": 30 },
+                { "task": "Piece rehearsal", "duration": 30 }
+              ]
+            }
+          }`,
         },
       ],
       response_format: { type: "json_object" },
@@ -117,21 +101,28 @@ export async function POST(request: Request) {
     // console.log("Raw OpenAI Response:", completion);
     // console.log("raw openai response");
     // console.dir(completion, { depth: null });
+
     //parse AI response
-    const aiPlan = completion.choices[0].message.content;
-    if (!aiPlan) throw new Error("No content in the OpenAI response");
 
-    console.log("aiPlan", aiPlan);
-
-    const plan = JSON.parse(aiPlan);
-    if (!plan.tasks || !Array.isArray(plan.tasks)) {
-      throw new Error("Invalid plan format from OpenAI");
+    const aiResponse = JSON.parse(
+      completion.choices[0].message.content || "{}"
+    );
+    // Validate response structure
+    if (!aiResponse?.schedule || typeof aiResponse.schedule !== "object") {
+      console.error("Invalid schedule format:", aiResponse);
+      throw new Error("AI returned an invalid schedule format");
     }
 
-    const schedulePlan = scheduleTasks(
-      plan.tasks,
-      parseInt(hoursPerDay),
-      parseInt(deadline)
+    // Validate at least one day exists
+    const scheduleDays = Object.keys(aiResponse.schedule);
+    if (scheduleDays.length === 0) {
+      throw new Error("AI returned an empty schedule");
+    }
+
+    const schedulePlan = mapScheduleToDates(
+      aiResponse.schedule,
+      parseInt(deadline),
+      parseInt(daysPerWeek)
     );
     // console.log("Scheduled Plan:", schedulePlan);
     return NextResponse.json(schedulePlan);

@@ -15,8 +15,20 @@ export default function Home() {
   const [topic, setTopic] = React.useState("");
   const [hoursPerDay, setHoursPerDay] = React.useState(1);
   const [plan, setPlan] = React.useState<StudyTask[]>([]);
+  const [daysPerWeek, setDaysPerWeek] = React.useState(0);
+  const [page, setPage] = React.useState(1);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState("");
+
+  function loadMore() {
+    setPage((prev) => prev + 1);
+  }
+  React.useEffect(() => {
+    if (page === 1) return;
+    fetch(`api/generate-plan?page=${page}`)
+      .then((res) => res.json())
+      .then((data) => setPlan((prev) => [...prev, ...data.plan]));
+  }, [page]);
 
   //make deadline work
   const [deadline, setDeadline] = React.useState(null);
@@ -70,6 +82,15 @@ export default function Home() {
             onChange={(e) => setHoursPerDay(Number(e.target.value))}
             required
           />
+          <input
+            type="number"
+            placeholder="Days/Week"
+            min="1"
+            max="7"
+            className="border p-2 w-24 rounded text-black"
+            value={daysPerWeek}
+            onChange={(e) => setDaysPerWeek(Number(e.target.value))}
+          />
           {/* <input type="text" /> */}
           <button
             type="submit"
@@ -77,6 +98,9 @@ export default function Home() {
             disabled={isLoading}
           >
             {isLoading ? "Generating..." : "Generate Plan"}
+          </button>
+          <button onClick={loadMore} className="mt-4 bg-gray-200 p-2 rounded">
+            Load Next 2 Weeks
           </button>
         </div>
         {error && <p className="text-red-500">{error}</p>}
